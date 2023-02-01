@@ -69,12 +69,23 @@ def get_team_date(team_id):
 
             players.append(
                 {
+                    "id": player["href"].split("/")[2],
                     "fullname": player.select_one("img")["title"],
                     "image": player.select_one("img")["src"],
                     "nickname": player["title"],
                     "country": {"name": country_name, "flag": country_flag}
                     if country_name
                     else None,
+                }
+            )
+
+        social_media = team_profile.select(".socialMediaButtons > a")
+        social = []
+        for media in social_media:
+            social.append(
+                {
+                    "name": media["href"].split(".")[1],
+                    "link": media["href"],
                 }
             )
 
@@ -92,9 +103,10 @@ def get_team_date(team_id):
                     "id": team_id,
                     "name": name,
                     "logo": logo,
+                    "social_media": social,
                     "ranking": ranking,
-                    "coach": coach,
                     "average_player_age": average_player_age,
+                    "coach": coach,
                     "players": players,
                 }
             ),
