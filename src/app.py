@@ -11,6 +11,94 @@ app = Flask(__name__)
 
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "changeme")
 
+# Function to get team upcoming matches
+def get_upcomming_matches(team_id, name):
+    # Fetch data for upcoming matches
+    headers = {"User-Agent": config.USER_AGENT}
+    response = requests.get(
+        config.BASE_URL + "/matches?team=" + team_id, headers=headers
+    )
+    body = response.text
+    soup = BeautifulSoup(body, "html.parser")
+    incoming_match = soup.select_one(".upcomingMatchesWrapper")
+
+    incoming_match_data = []
+    for match in incoming_match.select(".upcomingMatch"):
+        team1 = {
+            "name": match.select_one(".matchTeam.team1 .matchTeamName").text,
+            "logo": match.select_one(".matchTeam.team1 .matchTeamLogo")["src"],
+        }
+
+        team2 = {
+            "name": match.select_one(".matchTeam.team2 .matchTeamName").text,
+            "logo": match.select_one(".matchTeam.team2 .matchTeamLogo")["src"],
+        }
+
+        # Check wich team is the opponent
+        opponent = team2 if team1["name"] == name else team1
+
+        incoming_match_data.append(
+            {
+                "date": match.select_one(".matchTime").get("data-unix"),
+                "match_url": config.BASE_URL + match.select_one("a")["href"],
+                "type": match.select_one(".matchMeta").text,
+                "opponent": opponent,
+                "tournament": {
+                    "name": match.select_one(".matchEvent .matchEventName").text,
+                    "logo": match.select_one(".matchEvent .matchEventLogo")["src"],
+                },
+            }
+        )
+
+    return incoming_match_data
+
+
+# Function to get team matches history
+def get_history(team_id, name):
+
+    # Fetch data for results
+    headers = {"User-Agent": config.USER_AGENT}
+    response = requests.get(
+        config.BASE_URL + "/results?team=" + team_id, headers=headers
+    )
+    body = response.text
+    soup = BeautifulSoup(body, "html.parser")
+    result_match = soup.select_one(".results-all")
+    res = []
+    for day in result_match.select(".results-sublist"):
+        for match in day.select_one(".result-con"):
+            team1 = {
+                "name": match.select_one(".team1 .team").text,
+                "logo": match.select_one(".team1 .team-logo")["src"],
+            }
+            team2 = {
+                "name": match.select_one(".team2 .team").text,
+                "logo": match.select_one(".team2 .team-logo")["src"],
+            }
+
+            # Check who won
+            winner = match.select_one(".team-won").text
+            result = "Victory" if winner == name else "Defeat"
+
+            opponent = team2 if team1["name"] == name else team1
+
+            res.append(
+                {
+                    "result": result,
+                    "score": "",
+                    "opponent": opponent,
+                    "tournament": {
+                        "name": match.select_one(".event-name").text,
+                        "logo": match.select_one(".event-logo")["src"],
+                    },
+                    "type": match.select_one(".map-text").text,
+                    "match_url": match["href"],
+                }
+            )
+
+    return res
+
+
 # Route to get news
 @app.route("/news", methods=["GET"])
 def get_news():
@@ -108,6 +196,10 @@ def get_team_date(team_id):
                     "average_player_age": average_player_age,
                     "coach": coach,
                     "players": players,
+                    "matchs": {
+                        "incoming": get_upcomming_matches(team_id, name),
+                        "results": get_history(team_id, name),
+                    },
                 }
             ),
             200,
