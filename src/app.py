@@ -10,6 +10,7 @@ import config
 app = Flask(__name__)
 
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "changeme")
+app.config["JSON_SORT_KEYS"] = False
 
 # Function to get team upcoming matches
 def get_upcomming_matches(team_id, name):
