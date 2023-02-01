@@ -10,6 +10,30 @@ app = Flask(__name__)
 
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "changeme")
 
+# Route to get news
+@app.route("/news", methods=["GET"])
+def get_news():
+    res = requests.get(config.RSS_URL + "/news")
+    xml = res.text
+
+    if not xml.startswith("<?xml"):
+        return jsonify({"error": "Invalid XML"}), 400
+
+    root = ET.fromstring(xml)
+    rss = []
+
+    for item in root.findall("./channel/item"):
+        rss.append(
+            {
+                "title": item.find("./title").text,
+                "description": item.find("./description").text,
+                "link": item.find("./link").text,
+                "pub_date": item.find("./pubDate").text,
+            }
+        )
+
+    return jsonify(rss), 200
+
 
 # Route for monitoring a container
 @app.route("/health", methods=["GET"])
