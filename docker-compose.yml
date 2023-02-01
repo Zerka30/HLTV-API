@@ -1,0 +1,8 @@
+services:
+  hltv-api:
+    build: ./src
+    restart: always
+    container_name: hltv-api
+    entrypoint: python ./app.py
+    ports:
+      - "8000:80"
