@@ -130,6 +130,46 @@ def get_news():
     return jsonify(rss), 200
 
 
+# Route to get team by name
+@app.route("/team/<string:team_name>", methods=["GET"])
+def get_team(team_name):
+    try:
+        headers = {"User-Agent": config.USER_AGENT}
+        res = requests.get(
+            config.BASE_URL + "search?term=" + team_name, headers=headers
+        )
+
+        res = res.json()[0]["teams"][0]
+
+        players = []
+        for player in res["players"]:
+            players.append(
+                {
+                    "nickname": player["nickName"],
+                    "firstName": player["firstName"],
+                    "lastName": player["lastName"],
+                    "flag": player["flagUrl"],
+                    "hltvUrl": config.BASE_URL + player["location"],
+                }
+            )
+
+        return (
+            jsonify(
+                {
+                    "id": res["id"],
+                    "name": res["name"],
+                    "logo": res["teamLogoDay"],
+                    "flag": res["flagUrl"],
+                    "hltvUrl": config.BASE_URL + res["location"],
+                    "players": players,
+                }
+            ),
+            200,
+        )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 # Route to get team data
 @app.route("/team/<string:team_id>", methods=["GET"])
 def get_team_date(team_id):
