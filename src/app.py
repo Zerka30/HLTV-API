@@ -81,12 +81,21 @@ def get_history(team_id, name):
             winner = match.select_one(".team-won").text
             result = "Victory" if winner == name else "Defeat"
 
+            winner_score = match.select_one(".result-score .score-won").text
+            looser_score = match.select_one(".result-score .score-lost").text
+
+            score = (
+                winner_score + " - " + looser_score
+                if result == "Victory"
+                else looser_score + " - " + winner_score
+            )
+
             opponent = team2 if team1["name"] == name else team1
 
             res.append(
                 {
                     "result": result,
-                    "score": "",
+                    "score": score,
                     "opponent": opponent,
                     "tournament": {
                         "name": match.select_one(".event-name").text,
