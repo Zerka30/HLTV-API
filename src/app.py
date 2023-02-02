@@ -55,7 +55,7 @@ def get_upcomming_matches(team_id, name):
 
 
 # Function to get team matches history
-def get_history(team_id, name):
+def get_history(team_id):
 
     # Fetch data for results
     headers = {"User-Agent": config.USER_AGENT}
@@ -79,7 +79,7 @@ def get_history(team_id, name):
 
             # Check who won
             winner = match.select_one(".team-won").text
-            result = "Victory" if winner == name else "Defeat"
+            result = "Victory" if winner == team1["name"] else "Defeat"
 
             winner_score = match.select_one(".result-score .score-won").text
             looser_score = match.select_one(".result-score .score-lost").text
@@ -90,7 +90,7 @@ def get_history(team_id, name):
                 else looser_score + " - " + winner_score
             )
 
-            opponent = team2 if team1["name"] == name else team1
+            opponent = team2
 
             res.append(
                 {
@@ -208,7 +208,7 @@ def get_team_date(team_id):
                     "players": players,
                     "matchs": {
                         "incoming": get_upcomming_matches(team_id, name),
-                        "results": get_history(team_id, name),
+                        "results": get_history(team_id),
                     },
                 }
             ),
