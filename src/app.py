@@ -143,7 +143,7 @@ def search():
             team_name = request.args["team"]
             headers = {"User-Agent": config.USER_AGENT}
             res = requests.get(
-                config.BASE_URL + "search?term=" + team_name, headers=headers
+                config.BASE_URL + "/search?term=" + team_name, headers=headers
             )
 
             res = res.json()[0]["teams"][0]
@@ -181,7 +181,7 @@ def search():
             player_nickname = request.args["player"]
             headers = {"User-Agent": config.USER_AGENT}
             res = requests.get(
-                config.BASE_URL + "search?term=" + player_nickname, headers=headers
+                config.BASE_URL + "/search?term=" + player_nickname, headers=headers
             )
 
             res = res.json()[0]["players"][0]
