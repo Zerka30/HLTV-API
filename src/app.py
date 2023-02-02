@@ -232,6 +232,40 @@ def get_team_result(team_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+# Route to get player id by nickname
+@app.route("/player/<string:player_nickname>", methods=["GET"])
+def get_player_id(player_nickname):
+    try:
+        headers = {"User-Agent": config.USER_AGENT}
+        res = requests.get(
+            config.BASE_URL + "search?term=" + player_nickname, headers=headers
+        )
+
+        res = res.json()[0]["players"][0]
+
+        return (
+            jsonify(
+                {
+                    "id": res["id"],
+                    "nickname": res["nickName"],
+                    "firstName": res["firstName"],
+                    "lastName": res["lastName"],
+                    "flag": res["flagUrl"],
+                    "picture": res["pictureUrl"],
+                    "hltvUrl": config.BASE_URL + res["location"],
+                    "team": {
+                        "name": res["team"]["name"],
+                        "logo": res["team"]["teamLogoDay"],
+                        "hltvUrl": config.BASE_URL + res["team"]["location"],
+                    },
+                }
+            ),
+            200,
+        )
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 # Route for monitoring a container
 @app.route("/health", methods=["GET"])
 def healthcheck():
