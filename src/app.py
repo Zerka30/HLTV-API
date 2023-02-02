@@ -1,5 +1,6 @@
 import os
 import requests
+import re
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 from flask import Flask, jsonify, request
@@ -155,7 +156,7 @@ def search():
                         "firstName": player["firstName"],
                         "lastName": player["lastName"],
                         "flag": player["flagUrl"],
-                        "hltvUrl": config.BASE_URL + player["location"],
+                        "hltv_url": config.BASE_URL + player["location"],
                     }
                 )
 
@@ -166,7 +167,7 @@ def search():
                         "name": res["name"],
                         "logo": res["teamLogoDay"],
                         "flag": res["flagUrl"],
-                        "hltvUrl": config.BASE_URL + res["location"],
+                        "hltv_url": config.BASE_URL + res["location"],
                         "players": players,
                     }
                 ),
@@ -194,11 +195,11 @@ def search():
                         "lastName": res["lastName"],
                         "flag": res["flagUrl"],
                         "picture": res["pictureUrl"],
-                        "hltvUrl": config.BASE_URL + res["location"],
+                        "hltv_url": config.BASE_URL + res["location"],
                         "team": {
                             "name": res["team"]["name"],
                             "logo": res["team"]["teamLogoDay"],
-                            "hltvUrl": config.BASE_URL + res["team"]["location"],
+                            "hltv_url": config.BASE_URL + res["team"]["location"],
                         },
                     }
                 ),
@@ -308,6 +309,231 @@ def get_team_upcomming_matches(team_id):
 def get_team_result(team_id):
     try:
         return jsonify(get_history(team_id)), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# Route to get player data
+@app.route("/player/<string:player_id>", methods=["GET"])
+def get_player_data(player_id):
+    try:
+        headers = {"User-Agent": config.USER_AGENT}
+        response = requests.get(
+            config.BASE_URL + "/player/" + player_id + "/_", headers=headers
+        )
+        body = response.text
+
+        soup = BeautifulSoup(body, "html.parser")
+        player_profile = soup.select_one(".playerProfile")
+
+        # Get basics informations
+        name = player_profile.select_one(".playerRealname").text.strip()
+        team = player_profile.select_one(".playerTeam")
+
+        # Get all appearances in hltv top 20
+        try:
+            all_appearances = player_profile.select_one(".top20ListRight").find_all("a")
+            appearances = []
+            for appearance in all_appearances:
+                appearances.append(
+                    {
+                        "year": int(re.findall(r"\d{4}", appearance["href"])[1]),
+                        "positon": int(appearance.text.split("#")[0]),
+                        "news": config.BASE_URL + appearance["href"],
+                    }
+                )
+
+            top20 = all_appearances[-1]
+            top = {
+                "has_appeared": True if top20 is not None else False,
+                "last_appearance": {
+                    "year": int(re.findall(r"\d{4}", top20["href"])[1]),
+                    "positon": int(top20.text.split("#")[0]),
+                    "news": config.BASE_URL + top20["href"],
+                },
+                "all_appearances": appearances,
+            }
+        except:
+            top = {
+                "has_appeared": False,
+                "last_appearance": None,
+                "all_appearances": [],
+            }
+
+        # Check if the player is a major winner
+        try:
+            major = player_profile.select_one(".majorWinner").text
+            major_winner = {
+                "winner": True,
+                "champions": int(re.findall(r"\d{1}", major)[0]),
+            }
+        except:
+            major_winner = {"winner": False, "champions": None}
+
+        # General data about player and team
+        try:
+            stats = player_profile.select(".stat")
+            stats_data = []
+            for stat in stats:
+                stats_data.append(stat.text)
+
+            general_data = {
+                "numbers_teams": int(stats_data[0]),
+                "day_in_current_team": int(stats_data[1]),
+                "day_in_team": int(stats_data[2]),
+            }
+        except:
+            general_data = "error when getting general data"
+
+        # Get current team of the player
+        try:
+            current_team = None
+
+            team_element = player_profile.select_one(".team")
+            trophies = team_element.select_one(".trophy-row-trophy").select("a")
+            trophies_data = []
+            for trophy in trophies:
+                trophies_data.append(
+                    {
+                        "name": trophy.select_one("img")["title"],
+                        "trophy": config.BASE_URL + trophy.select_one("img")["src"],
+                        "event_url": config.BASE_URL + trophy["href"],
+                    }
+                )
+
+            current_team = {
+                "name": team_element.select_one(".team-name").text,
+                "logo": team_element.select_one(".team-logo")["src"],
+                "date": {
+                    "entrance": int(
+                        team_element.select_one(".time-period-cell")
+                        .select_one("span")
+                        .get("data-unix")
+                    ),
+                    "left": None,
+                },
+                "trophies": trophies_data,
+                "hltv_url": config.BASE_URL
+                + team_element.select_one(".team-name-cell").select_one("a")["href"],
+            }
+        except:
+            current_team = None
+
+        # Get former teams of the player
+        try:
+            former_teams = []
+            for team in player_profile.select(".past-team"):
+                date = team.select_one(".time-period-cell").select("span")
+                trophies = team.select_one(".trophy-row-trophy").select("a")
+                trophies_data = []
+                for trophy in trophies:
+                    trophies_data.append(
+                        {
+                            "name": trophy.select_one("img")["title"],
+                            "trophy": config.BASE_URL + trophy.select_one("img")["src"],
+                            "event_url": config.BASE_URL + trophy["href"],
+                        }
+                    )
+
+                former_teams.append(
+                    {
+                        "name": team.select_one(".team-name").text,
+                        "logo": team.select_one(".team-logo")["src"],
+                        "date": {
+                            "entrance": int(date[0].get("data-unix")),
+                            "left": int(date[1].get("data-unix")),
+                        },
+                        "trophies": trophies_data,
+                        "hltv_url": config.BASE_URL
+                        + team.select_one(".team-name-cell").select_one("a")["href"],
+                    }
+                )
+        except:
+            former_teams = "error when fetching former teams"
+
+        # Get trophies win by the player
+        trophies = {"trophies": [], "mvps": [], "htlv_top20": top}
+        try:
+            trophies_selector = player_profile.select_one("#Trophies")
+            trophies_element = trophies_selector.select(".trophy-detail")
+
+            for trophy in trophies_element:
+                trophyUrl = trophy.select_one("img")["src"]
+
+                # Check if the trophy is a valid url
+                if not trophyUrl.startswith("https://"):
+                    trophyUrl = config.BASE_URL + trophy.select_one("img")["src"]
+
+                trophies["trophies"].append(
+                    {
+                        "name": trophy.select_one(".trophy-event").text,
+                        "trophy": trophyUrl,
+                        "event_url": config.BASE_URL + trophy.select_one("a")["href"],
+                    }
+                )
+        except:
+            trophies["trophies"] = "error when fetching trophies"
+
+        # Get mvps win by the player
+        try:
+            mvps_selector = player_profile.select_one("#MVPs")
+            mvps_element = mvps_selector.select(".trophy-detail")
+
+            for mvp in mvps_element:
+                mvpUrl = mvp.select_one("img")["src"]
+
+                # Check if the trophy is a valid url
+                if not mvpUrl.startswith("https://"):
+                    mvpUrl = config.BASE_URL + mvp.select_one("img")["src"]
+
+                trophies["mvps"].append(
+                    {
+                        "name": mvp.select_one(".trophy-event").text,
+                        "trophy": mvpUrl,
+                        "event_url": config.BASE_URL + mvp.select_one("a")["href"],
+                    }
+                )
+        except:
+            trophies["mvps"] = "error when fetching mvps"
+
+        # Get basics statistics
+        stats = player_profile.select(".statsVal")
+        stats_data = []
+        for stats in stats:
+            stats_data.append(stats.text)
+
+        return jsonify(
+            {
+                "id": player_id,
+                "nickname": player_profile.select_one(".playerNickname").text,
+                "name": {
+                    # Attribut fullname has a space between firstname, we want to remove it
+                    "fullname": name,
+                    "firstname": name.split(" ")[0],
+                    "lastname": name.split(" ")[1],
+                },
+                "picture": player_profile.select_one(".bodyshot-img")["src"],
+                "age": int(
+                    re.findall(r"\d+", player_profile.select_one(".playerAge").text)[0]
+                ),
+                "flag": config.BASE_URL + player_profile.select_one(".flag")["src"],
+                "teams": {
+                    "general_data": general_data,
+                    "current_team": current_team,
+                    "former_teams": former_teams,
+                },
+                "trophies": trophies,
+                "stats": {
+                    "rating": float(stats_data[0]),
+                    "kills_per_round": float(stats_data[1]),
+                    "headshot_percentage": float(stats_data[2].split("%")[0]),
+                    "maps_played": int(stats_data[3]),
+                    "deaths_per_round": float(stats_data[4]),
+                    "rounds_contributed": float(stats_data[5].split("%")[0]),
+                },
+                "major_winner": major_winner,
+            }
+        )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
