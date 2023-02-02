@@ -211,6 +211,58 @@ def search():
         return jsonify({"status": "error", "message": "Invalid query"}), 400
 
 
+# Route to get top 30 teams
+@app.route("/ranking", methods=["GET"])
+def get_top_teams():
+    try:
+        response = requests.get(
+            config.BASE_URL + "/ranking/teams",
+            headers={"User-Agent": config.USER_AGENT},
+        )
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+        all_content = soup.select(".ranked-team")
+        teams = []
+
+        for element in all_content:
+            id = int(element.select_one(".moreLink")["href"].split("/")[2])
+            ranking = int(element.select_one(".position").text.replace("#", ""))
+            logo = element.select_one(".team-logo img")["src"]
+            name = element.select_one(".teamLine .name").text
+            players = []
+
+            for p in element.select(".player-holder"):
+                player = p.select_one("a")
+                pic = player.select_one(".playerPicture")
+                nickname = player.select_one(".nick").text
+
+                players.append(
+                    {
+                        "id": int(player["href"].split("/")[2]),
+                        "nickname": nickname,
+                        "fullname": player.select_one(".playerPicture")["alt"]
+                        .replace(f"'{nickname}'", "")
+                        .replace("  ", " "),
+                        "picture": player.select_one(".playerPicture")["src"],
+                        "hltv_url": config.BASE_URL + player["href"],
+                    }
+                )
+            teams.append(
+                {
+                    "id": id,
+                    "ranking": ranking,
+                    "name": name,
+                    "logo": logo,
+                    "players": players,
+                }
+            )
+
+        return jsonify(teams), 200
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 # Route to get team data
 @app.route("/team/<string:team_id>", methods=["GET"])
 def get_team_date(team_id):
