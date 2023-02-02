@@ -13,7 +13,7 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "changeme")
 app.config["JSON_SORT_KEYS"] = False
 
 # Function to get team upcoming matches
-def get_upcomming_matches(team_id, name):
+def get_upcomming_matches(team_id):
     # Fetch data for upcoming matches
     headers = {"User-Agent": config.USER_AGENT}
     response = requests.get(
@@ -25,18 +25,14 @@ def get_upcomming_matches(team_id, name):
 
     incoming_match_data = []
     for match in incoming_match.select(".upcomingMatch"):
-        team1 = {
-            "name": match.select_one(".matchTeam.team1 .matchTeamName").text,
-            "logo": match.select_one(".matchTeam.team1 .matchTeamLogo")["src"],
-        }
 
         team2 = {
             "name": match.select_one(".matchTeam.team2 .matchTeamName").text,
             "logo": match.select_one(".matchTeam.team2 .matchTeamLogo")["src"],
         }
 
-        # Check wich team is the opponent
-        opponent = team2 if team1["name"] == name else team1
+        # Opponent is always the other team
+        opponent = team2
 
         incoming_match_data.append(
             {
@@ -207,7 +203,7 @@ def get_team_date(team_id):
                     "coach": coach,
                     "players": players,
                     "matchs": {
-                        "incoming": get_upcomming_matches(team_id, name),
+                        "incoming": get_upcomming_matches(team_id),
                         "results": get_history(team_id),
                     },
                 }
