@@ -2,7 +2,7 @@ import os
 import requests
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 
 import config
 
@@ -130,44 +130,84 @@ def get_news():
     return jsonify(rss), 200
 
 
-# Route to get team by name
-@app.route("/team/<string:team_name>", methods=["GET"])
-def get_team(team_name):
-    try:
-        headers = {"User-Agent": config.USER_AGENT}
-        res = requests.get(
-            config.BASE_URL + "search?term=" + team_name, headers=headers
-        )
+# Route to search a team or a player
+@app.route("/search", methods=["GET"])
+def search():
+    # The query will be like this : /search?team=team_name or /search?player=player_name
+    # First of all, we need to check if the query is for a team or a player
 
-        res = res.json()[0]["teams"][0]
-
-        players = []
-        for player in res["players"]:
-            players.append(
-                {
-                    "nickname": player["nickName"],
-                    "firstName": player["firstName"],
-                    "lastName": player["lastName"],
-                    "flag": player["flagUrl"],
-                    "hltvUrl": config.BASE_URL + player["location"],
-                }
+    # If the query is for a team
+    if "team" in request.args:
+        try:
+            team_name = request.args["team"]
+            headers = {"User-Agent": config.USER_AGENT}
+            res = requests.get(
+                config.BASE_URL + "search?term=" + team_name, headers=headers
             )
 
-        return (
-            jsonify(
-                {
-                    "id": res["id"],
-                    "name": res["name"],
-                    "logo": res["teamLogoDay"],
-                    "flag": res["flagUrl"],
-                    "hltvUrl": config.BASE_URL + res["location"],
-                    "players": players,
-                }
-            ),
-            200,
-        )
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+            res = res.json()[0]["teams"][0]
+
+            players = []
+            for player in res["players"]:
+                players.append(
+                    {
+                        "nickname": player["nickName"],
+                        "firstName": player["firstName"],
+                        "lastName": player["lastName"],
+                        "flag": player["flagUrl"],
+                        "hltvUrl": config.BASE_URL + player["location"],
+                    }
+                )
+
+            return (
+                jsonify(
+                    {
+                        "id": res["id"],
+                        "name": res["name"],
+                        "logo": res["teamLogoDay"],
+                        "flag": res["flagUrl"],
+                        "hltvUrl": config.BASE_URL + res["location"],
+                        "players": players,
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+    # If the query is for a player
+    elif "player" in request.args:
+        try:
+            player_nickname = request.args["player"]
+            headers = {"User-Agent": config.USER_AGENT}
+            res = requests.get(
+                config.BASE_URL + "search?term=" + player_nickname, headers=headers
+            )
+
+            res = res.json()[0]["players"][0]
+
+            return (
+                jsonify(
+                    {
+                        "id": res["id"],
+                        "nickname": res["nickName"],
+                        "firstName": res["firstName"],
+                        "lastName": res["lastName"],
+                        "flag": res["flagUrl"],
+                        "picture": res["pictureUrl"],
+                        "hltvUrl": config.BASE_URL + res["location"],
+                        "team": {
+                            "name": res["team"]["name"],
+                            "logo": res["team"]["teamLogoDay"],
+                            "hltvUrl": config.BASE_URL + res["team"]["location"],
+                        },
+                    }
+                ),
+                200,
+            )
+        except Exception as e:
+            return jsonify({"status": "error", "message": str(e)}), 500
+    else:
+        return jsonify({"status": "error", "message": "Invalid query"}), 400
 
 
 # Route to get team data
@@ -268,40 +308,6 @@ def get_team_upcomming_matches(team_id):
 def get_team_result(team_id):
     try:
         return jsonify(get_history(team_id)), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-# Route to get player id by nickname
-@app.route("/player/<string:player_nickname>", methods=["GET"])
-def get_player_id(player_nickname):
-    try:
-        headers = {"User-Agent": config.USER_AGENT}
-        res = requests.get(
-            config.BASE_URL + "search?term=" + player_nickname, headers=headers
-        )
-
-        res = res.json()[0]["players"][0]
-
-        return (
-            jsonify(
-                {
-                    "id": res["id"],
-                    "nickname": res["nickName"],
-                    "firstName": res["firstName"],
-                    "lastName": res["lastName"],
-                    "flag": res["flagUrl"],
-                    "picture": res["pictureUrl"],
-                    "hltvUrl": config.BASE_URL + res["location"],
-                    "team": {
-                        "name": res["team"]["name"],
-                        "logo": res["team"]["teamLogoDay"],
-                        "hltvUrl": config.BASE_URL + res["team"]["location"],
-                    },
-                }
-            ),
-            200,
-        )
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
