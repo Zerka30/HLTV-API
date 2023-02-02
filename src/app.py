@@ -223,6 +223,15 @@ def get_team_upcomming_matches(team_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+# Route to get team result
+@app.route("/team/<string:team_id>/result", methods=["GET"])
+def get_team_result(team_id):
+    try:
+        return jsonify(get_history(team_id)), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 # Route for monitoring a container
 @app.route("/health", methods=["GET"])
 def healthcheck():
