@@ -700,6 +700,174 @@ def get_player_data(player_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+# Route to get complete player statistics
+@app.route("/player/<int:player_id>/stats", methods=["GET"])
+def get_player_stats(player_id):
+    try:
+        headers = {"User-Agent": config.USER_AGENT}
+        response = requests.get(
+            config.BASE_URL + "/stats/players/" + str(player_id) + "/_", headers=headers
+        )
+        body = response.text
+
+        soup = BeautifulSoup(body, "html.parser")
+        player_profile = soup.select_one(".playerSummaryStatBox")
+        stats_element = soup.select_one(".statistics")
+        stats_data = {}
+        for stats in stats_element.select(".stats-row"):
+            stats_data[stats.select("span")[0].text] = float(
+                stats.select("span")[1].text.split("%")[0]
+            )
+
+        for main_row in soup.select(".summaryStatBreakdownRow"):
+            for stats in main_row.select(".summaryStatBreakdown"):
+                if (
+                    stats.select_one(".summaryStatBreakdownSubHeader")
+                    .contents[0]
+                    .strip()
+                    == "KAST"
+                ):
+                    stats_data[
+                        stats.select_one(".summaryStatBreakdownSubHeader")
+                        .contents[0]
+                        .strip()
+                    ] = float(
+                        stats.select_one(".summaryStatBreakdownDataValue").text.split(
+                            "%"
+                        )[0]
+                    )
+                elif (
+                    stats.select_one(".summaryStatBreakdownSubHeader")
+                    .contents[0]
+                    .strip()
+                    == "Impact"
+                ):
+                    stats_data[
+                        stats.select_one(".summaryStatBreakdownSubHeader")
+                        .contents[0]
+                        .strip()
+                    ] = float(stats.select_one(".summaryStatBreakdownDataValue").text)
+
+        # Get player's shape
+        shape = []
+        shape_element = soup.select_one(".featured-ratings-container")
+        for element in shape_element.select(".rating-value"):
+            shape.append(float(element.text))
+
+        # Fetching new page for more stats
+        headers = {"User-Agent": config.USER_AGENT}
+        response = requests.get(
+            config.BASE_URL + "/stats/players/individual/" + str(player_id) + "/_",
+            headers=headers,
+        )
+        body = response.text
+
+        soup = BeautifulSoup(body, "html.parser")
+
+        for stats_box in soup.select(".columns .standard-box"):
+            for stats in stats_box.select(".stats-row"):
+                # Just to avoid errors on specific data, using 3 span
+                try:
+                    stats_data[stats.select("span")[0].text.strip()] = float(
+                        stats.select("span")[1].text.split("%")[0]
+                    )
+                except:
+                    pass
+
+        return jsonify(
+            {
+                "name": player_profile.select_one(".summaryNickname").text,
+                "fullname": player_profile.select_one(".summaryRealname").text.strip(),
+                "age": int(
+                    re.findall(
+                        r"\d+", player_profile.select_one(".summaryPlayerAge").text
+                    )[0]
+                ),
+                "flag": config.BASE_URL + player_profile.select_one(".flag")["src"],
+                "team": config.BASE_URL
+                + player_profile.select_one(".SummaryTeamname").select_one("a")["href"],
+                "stats": {
+                    "rating": stats_data["Rating 1.0"],
+                    "kast": stats_data["KAST"],
+                    "impact": stats_data["Impact"],
+                    "total_kills": stats_data["Total kills"],
+                    "headshot_percentage": stats_data["Headshot %"],
+                    "total_deaths": stats_data["Total deaths"],
+                    "k/d_ratio": stats_data["K/D Ratio"],
+                    "damage_per_round": stats_data["Damage / Round"],
+                    "grenae_damage_per_round": stats_data["Grenade dmg / Round"],
+                    "maps_played": stats_data["Maps played"],
+                    "rounds_played": stats_data["Rounds played"],
+                    "kills_per_round": stats_data["Kills / round"],
+                    "assists_per_round": stats_data["Assists / round"],
+                    "deaths_per_round": stats_data["Deaths / round"],
+                    "saved_by_teammates": stats_data["Saved by teammate / round"],
+                    "saved_teammates": stats_data["Saved teammates / round"],
+                    "featured_rating": {
+                        "vs_top_5": shape[0],
+                        "vs_top_10": shape[1],
+                        "vs_top_20": shape[2],
+                        "vs_top_30": shape[3],
+                        "vs_top_50": shape[4],
+                    },
+                    "rounds_stats": {
+                        "0_kill_per_rounds": stats_data["0 kill rounds"],
+                        "1_kill_per_rounds": stats_data["1 kill rounds"],
+                        "2_kill_per_rounds": stats_data["2 kill rounds"],
+                        "3_kill_per_rounds": stats_data["3 kill rounds"],
+                        "4_kill_per_rounds": stats_data["4 kill rounds"],
+                        "5_kill_per_rounds": stats_data["5 kill rounds"],
+                    },
+                    "opening_stats": {
+                        "total_opening_kills": stats_data["Total opening kills"],
+                        "total_opening_deaths": stats_data["Total opening deaths"],
+                        "opening_kill_ratio": stats_data["Opening kill ratio"],
+                        "opening_kill_rating": stats_data["Opening kill rating"],
+                        "win_percentage_after_opening_kill": stats_data[
+                            "Team win percent after first kill"
+                        ],
+                        "first_kill_won_per_round": stats_data[
+                            "First kill in won rounds"
+                        ],
+                    },
+                    "weapon_stats": {
+                        "rifles": stats_data["Rifle kills"],
+                        "snipers": stats_data["Sniper kills"],
+                        "smgs": stats_data["SMG kills"],
+                        "pistols": stats_data["Pistol kills"],
+                        "nades": stats_data["Grenade"],
+                        "other": stats_data["Other"],
+                    },
+                    "clutch_stats": {
+                        "1v1": {
+                            "wins": "",
+                            "losses": "",
+                        },
+                        "1v2": {
+                            "wins": "",
+                            "losses": "",
+                        },
+                        "1v3": {
+                            "wins": "",
+                            "losses": "",
+                        },
+                        "1v4": {
+                            "wins": "",
+                            "losses": "",
+                        },
+                        "1v5": {
+                            "wins": "",
+                            "losses": "",
+                        },
+                    },
+                },
+            }
+        )
+    except Exception as e:
+        raise e
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 # Route for monitoring a container
 @app.route("/health", methods=["GET"])
 def healthcheck():
