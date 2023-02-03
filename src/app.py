@@ -26,7 +26,6 @@ def get_upcomming_matches(team_id):
 
     incoming_match_data = []
     for match in incoming_match.select(".upcomingMatch"):
-
         team2 = {
             "name": match.select_one(".matchTeam.team2 .matchTeamName").text,
             "logo": match.select_one(".matchTeam.team2 .matchTeamLogo")["src"],
@@ -37,14 +36,15 @@ def get_upcomming_matches(team_id):
 
         incoming_match_data.append(
             {
-                "date": match.select_one(".matchTime").get("data-unix"),
-                "match_url": config.BASE_URL + match.select_one("a")["href"],
-                "type": match.select_one(".matchMeta").text,
+                "id": int(match.select_one("a")["href"].split("/")[2]),
                 "opponent": opponent,
                 "tournament": {
                     "name": match.select_one(".matchEvent .matchEventName").text,
                     "logo": match.select_one(".matchEvent .matchEventLogo")["src"],
                 },
+                "type": match.select_one(".matchMeta").text,
+                "date": int(match.select_one(".matchTime").get("data-unix")),
+                "match_url": config.BASE_URL + match.select_one("a")["href"],
             }
         )
 
@@ -91,6 +91,7 @@ def get_history(team_id):
 
             res.append(
                 {
+                    "id": int(match["href"].split("/")[2]),
                     "result": result,
                     "score": score,
                     "opponent": opponent,
@@ -99,7 +100,7 @@ def get_history(team_id):
                         "logo": match.select_one(".event-logo")["src"],
                     },
                     "type": match.select_one(".map-text").text,
-                    "match_url": match["href"],
+                    "match_url": config.BASE_URL + match["href"],
                 }
             )
 
@@ -350,7 +351,7 @@ def get_team_date(team_id):
 
 
 # Route to get team upcomming matches
-@app.route("/team/<string:team_id>/upcomming", methods=["GET"])
+@app.route("/team/<string:team_id>/upcoming", methods=["GET"])
 def get_team_upcomming_matches(team_id):
     try:
         return jsonify(get_upcomming_matches(team_id)), 200
