@@ -293,11 +293,13 @@ def get_team_date(team_id):
         for player in lineup:
             country_name = player.select_one(".flag")["title"]
             country_flag = f"{config.BASE_URL}{player.select_one('.flag')['src']}"
-
+            nickname = player["title"]
             players.append(
                 {
-                    "id": player["href"].split("/")[2],
-                    "fullname": player.select_one("img")["title"],
+                    "id": int(player["href"].split("/")[2]),
+                    "fullname": player.select_one("img")["title"]
+                    .replace(f"'{nickname}'", "")
+                    .replace("  ", " "),
                     "image": player.select_one("img")["src"],
                     "nickname": player["title"],
                     "country": {"name": country_name, "flag": country_flag}
