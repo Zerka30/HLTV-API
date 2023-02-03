@@ -327,17 +327,124 @@ def get_team_date(team_id):
         average_player_age = float(stats_container[2].select_one(".right").text)
         coach = stats_container[3].select_one(".right").text.strip()
 
+        # Get map statistics
+        map_stats = {
+            "dust2": None,
+            "mirage": None,
+            "inferno": None,
+            "overpass": None,
+            "nuke": None,
+            "vertigo": None,
+            "ancient": None,
+            "anubis": None,
+        }
+
+        # Get team maps statistics
+        try:
+            maps_statistics = team_profile.select_one(".map-statistics")
+
+            i = 0
+            for maps in maps_statistics.select(".map-statistics-container"):
+                map_name = maps_statistics.select(".map-statistics-row-map-mapname")[
+                    i
+                ].text
+                map_stats[map_name.lower()] = float(
+                    maps.select_one(".map-statistics-row-win-percentage").text.split(
+                        "%"
+                    )[0]
+                )
+                i += 1
+        except:
+            map_stats = "[ERROR] No map statistics available..."
+
+        # Get team 5 last maps
+        try:
+            last_maps = team_profile.select_one(".last-5-matches")
+            last_5_maps = []
+
+            for maps in last_maps.select("a"):
+                opponent = maps.select_one(".highlighted-team-name").text
+                map_result = maps.select_one(".highlighted-match-status").text
+                last_5_maps.append(
+                    {
+                        "opponent": opponent,
+                        "result": map_result,
+                    }
+                )
+        except:
+            last_5_maps = "[ERROR] No last 5 maps available..."
+
+        # Get team upcomming matches
+        try:
+            upcomming = team_profile.select_one("#ongoingEvents")
+            events = upcomming.select_one(".upcoming-events-holder")
+            upcoming_events = []
+            for event in events.select("a"):
+                date = event.select("span[data-unix]")
+
+                # Managed events that start and end at the same date
+                try:
+                    start = int(date[0].get("data-unix"))
+                    end = int(date[1].get("data-unix"))
+                except:
+                    start = int(date[0].get("data-unix"))
+                    end = int(date[0].get("data-unix"))
+
+                upcoming_events.append(
+                    {
+                        "name": event.select_one(".eventbox-eventname").text,
+                        "logo": event.select_one(".eventbox-eventlogo").select_one(
+                            "img"
+                        )["src"],
+                        "date": {
+                            "start": start,
+                            "end": end,
+                        },
+                        "hltv_url": config.BASE_URL + event["href"],
+                    }
+                )
+        except Exception as e:
+            upcoming_events = []
+
+        # Get team trophies
+        try:
+            trophies = team_profile.select_one(".trophyRow")
+            trophies_data = []
+            for trophy in trophies.select("a"):
+                trophies_data.append(
+                    {
+                        "name": trophies.select_one(".trophyDescription")["title"],
+                        "logo": trophies.select_one(".trophyIcon")["src"],
+                        "hltv_url": config.BASE_URL + trophy["href"],
+                    }
+                )
+        except:
+            trophies_data = []
+
+        # Get team country
+        country = {
+            "name": team_profile.select_one(".team-country").text,
+            "flag": config.BASE_URL + team_profile.select_one(".flag")["src"],
+        }
+
         return (
             jsonify(
                 {
-                    "id": team_id,
+                    "id": int(team_id),
                     "name": name,
                     "logo": logo,
-                    "social_media": social,
                     "ranking": ranking,
+                    "country": country,
                     "average_player_age": average_player_age,
                     "coach": coach,
                     "players": players,
+                    "stats": {
+                        "last_5_maps": last_5_maps,
+                        "past_3_months": map_stats,
+                    },
+                    "trophies": trophies_data,
+                    "social_media": social,
+                    "upcomming_events": upcoming_events,
                     "matchs": {
                         "incoming": get_upcomming_matches(team_id),
                         "results": get_history(team_id),
